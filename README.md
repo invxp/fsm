@@ -19,7 +19,7 @@ FileHashmap 文件Hash索引（支持重复的Key）基于Go实现, 能力列表
 ```go
 package main
 
-func TestRaft(t *testing.T) {
+func Test_Main(t *testing.T) {
 	// 初始化
 	// 最大索引槽数量
 	// 最大索引数量
@@ -42,7 +42,7 @@ func TestRaft(t *testing.T) {
 	// 打印KV
 	printKV(t, fhm, "0", 1, 1)
 }
-```Cancel changes
+```
 
 测试用例可以这样做:
 
