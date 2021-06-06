@@ -5,7 +5,6 @@ import (
 	"math"
 	"os"
 	"strconv"
-	"time"
 )
 
 // HeaderSize 头信息大小
@@ -26,73 +25,95 @@ const SlotSize = 4
 // [12-15]（链表Index）4字节
 const IndexSize = 16
 
-// FileIndex Get返回的结构体
-type FileIndex struct {
-	Key 	string
-	Value 	uint32
-	Time    uint32
-	Index   uint32
-}
+// DefaultMaxSlotCount 默认最大槽的数量（500W）
+const DefaultMaxSlotCount = 5000000
 
-// FileHashmap KV-FileStorage
-type FileHashmap struct {
-	//最大索引槽数量（可配置）
-	maxSlotCount 	uint32
-	//最大索引数量（可配置）
-	maxIndexCount 	uint32
-	//最多文件数量（可配置）
-	maxFileCount uint
-	//文件列表
-	fileList map[uint]*os.File
-	//是否打印日志
-	printLog bool
+// DefaultMaxIndexCount 默认最大索引的数量，推荐槽数量的4倍（4 * 500W = 2000W）
+const DefaultMaxIndexCount = 20000000
+
+// DefaultMaxFileCount 默认最大索引文件数量
+const DefaultMaxFileCount = 1024
+
+// NewFileHashMap 初始化对象（选定一个目录）
+func NewFileHashMap(maxSlotCount, maxIndexCount uint32, maxFileCount uint, database string) *fileHashmap {
+	if maxSlotCount == 0 {
+		maxSlotCount = DefaultMaxSlotCount
+	}
+	if maxIndexCount == 0 {
+		maxIndexCount = DefaultMaxIndexCount
+	}
+	if maxFileCount == 0 {
+		maxFileCount = DefaultMaxFileCount
+	}
+
+	hashMap := &fileHashmap{maxSlotCount,
+		maxIndexCount,
+		maxFileCount,
+		make(map[uint]*os.File)}
+
+	err := os.MkdirAll(database, 0755)
+
+	if err != nil {
+		panic(err)
+	}
+
+	for i := uint(0); i < hashMap.maxFileCount; i++ {
+		var err error
+		hashMap.fileList[i], err = os.OpenFile(database+string(os.PathSeparator)+strconv.FormatUint(uint64(i), 10), os.O_CREATE|os.O_RDWR|os.O_SYNC|os.O_TRUNC, 0666)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	log.Println("loading db", database, maxFileCount, "files")
+
+	return hashMap
 }
 
 // Set Key=String, Value = uint32
-func (f *FileHashmap) Set(key string, value uint32) {
+func (f *fileHashmap) Set(key string, value uint32) {
+	if key == "" {
+		return
+	}
 	keyHash := f.hashcode(key)
-	filePos := uint(keyHash) % f.maxFileCount
-	slotPos := keyHash % f.maxSlotCount
-	absSlotPos := int64(HeaderSize) + int64(slotPos) * int64(SlotSize)
-	slotValue := f.readUInt32(absSlotPos, filePos)
+
+	absFilePos := uint(keyHash) % f.maxFileCount
+
+	absSlotPos := int64(HeaderSize) + int64(keyHash%f.maxSlotCount)*int64(SlotSize)
+
+	slotValue := f.readUInt32(absSlotPos, absFilePos)
 
 	if slotValue == math.MaxUint32 {
 		slotValue = 0
 	}
 
-	absIndexStartPos := int64(HeaderSize) + int64(f.maxSlotCount) * int64(SlotSize)
+	currentAvailableSize := f.nextWriteableIndexOffset(absFilePos)
 
-	currentAvailableSize := f.nextWriteableIndexOffset(filePos)
+	f.writeUInt32(absSlotPos, currentAvailableSize, absFilePos)
 
-	absIndexWritePos := absIndexStartPos + int64(currentAvailableSize) * int64(IndexSize)
+	absIndexStartPos := int64(HeaderSize) + int64(f.maxSlotCount)*int64(SlotSize) + int64(currentAvailableSize*IndexSize)
 
-	lastTime := f.writeBeginTime(filePos)
-	now := time.Now().Unix()
-	f.writeUInt32(absSlotPos, currentAvailableSize, filePos)
-
-	lastAvailableSize := f.nextWriteableIndexOffset(filePos)
-
-	f.writeIndex(absIndexWritePos, keyHash, value, uint32(now) - uint32(lastTime), slotValue, filePos)
-
-	f.writeEndTime(uint64(now), filePos)
-
-	f.writeNextWriteableIndexOffset(filePos)
-
-	if f.printLog {
-		log.Printf("Set --- IndexPos: %d, SlotValue: %d, AvailiableSize: %d->%d\n", absIndexWritePos, slotValue, currentAvailableSize, lastAvailableSize)
-	}
+	f.writeIndex(absIndexStartPos, keyHash, value, uint32(f.writeBeginTime(absFilePos)), slotValue, absFilePos)
 }
 
 // Get Key=String
 // 返回Key数组（可以重复）
-func (f *FileHashmap) Get(key string) []FileIndex {
-	fi := make([]FileIndex, 0)
+func (f *fileHashmap) Get(key string) []uint32 {
+	values := make([]uint32, 0)
+
+	if key == "" {
+		return values
+	}
 
 	keyHash := f.hashcode(key)
-	filePos := uint(keyHash) % f.maxFileCount
+
+	absFilePos := uint(keyHash) % f.maxFileCount
+
 	slotPos := keyHash % f.maxSlotCount
-	absSlotPos := int64(HeaderSize) + int64(slotPos) * int64(SlotSize)
-	slotValue := f.readUInt32(absSlotPos, filePos)
+
+	absSlotPos := int64(HeaderSize) + int64(slotPos)*int64(SlotSize)
+
+	slotValue := f.readUInt32(absSlotPos, absFilePos)
 
 	if slotValue == math.MaxUint32 {
 		return nil
@@ -105,49 +126,16 @@ func (f *FileHashmap) Get(key string) []FileIndex {
 	for {
 		absIndexPos := int64(HeaderSize) + int64(f.maxSlotCount)*int64(SlotSize) + int64(nextIndex)*int64(IndexSize)
 
-		keyHashRead := f.readUInt32(absIndexPos, filePos)
+		hash, value, _, prevIndex := f.readIndex(absIndexPos, absFilePos)
 
-		value := f.readUInt32(absIndexPos + 4, filePos)
-
-		timeDiff := f.readUInt32(absIndexPos + 4 + 4, filePos)
-
-		prevIndex := f.readUInt32(absIndexPos + 4 + 4 + 4, filePos)
-
-		if keyHash == keyHashRead {
-			fi = append(fi, FileIndex{key, value, timeDiff, prevIndex})
-		}
-
-		if f.printLog {
-			log.Printf("Get --- IndexPos: %d, SlotValue: %d, NextIndex: %d, LastIndex: %d, Value: %d\n", absIndexPos, nextIndex, prevIndex, lastIndex, value)
+		if keyHash == hash {
+			values = append(values, value)
 		}
 
 		if (prevIndex == lastIndex) || (nextIndex == 0 && prevIndex == 0) {
-			return fi
+			return values
 		}
 
 		nextIndex = prevIndex
 	}
-}
-
-// LoadFiles 加载索引文件（选定一个目录）
-func (f *FileHashmap) LoadFiles(absDirPath string) {
-	if f.fileList == nil {
-		f.fileList = make(map[uint]*os.File)
-	}
-
-	err := os.MkdirAll(absDirPath, 0755)
-
-	if err != nil {
-		panic(err)
-	}
-
-	for i := uint(0); i < f.maxFileCount; i++ {
-		var err error
-		f.fileList[i], err = os.OpenFile(absDirPath + string(os.PathSeparator) + strconv.FormatUint(uint64(i), 10), os.O_CREATE|os.O_RDWR|os.O_SYNC|os.O_TRUNC, 0666)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	log.Println("loading", len(f.fileList), "files")
 }

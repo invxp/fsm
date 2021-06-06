@@ -10,7 +10,7 @@ import (
 	"math"
 )
 
-func (f *FileHashmap) writeUInt32(pos int64, val uint32, filePos uint) {
+func (f *fileHashmap) writeUInt32(pos int64, val uint32, filePos uint) {
 	if f.fileList[filePos] == nil {
 		panic(fmt.Errorf("file %d not open", filePos))
 	}
@@ -25,7 +25,7 @@ func (f *FileHashmap) writeUInt32(pos int64, val uint32, filePos uint) {
 	}
 }
 
-func (f *FileHashmap) readUInt32(absPos int64, filePos uint) uint32 {
+func (f *fileHashmap) readUInt32(absPos int64, filePos uint) uint32 {
 	if f.fileList[filePos] == nil {
 		panic(fmt.Errorf("file %d not open", filePos))
 	}
@@ -47,7 +47,7 @@ func (f *FileHashmap) readUInt32(absPos int64, filePos uint) uint32 {
 	return val
 }
 
-func (f *FileHashmap) writeUInt64(pos int64, val uint64, filePos uint) {
+func (f *fileHashmap) writeUInt64(pos int64, val uint64, filePos uint) {
 	if f.fileList[filePos] == nil {
 		panic(fmt.Errorf("file %d not open", filePos))
 	}
@@ -62,7 +62,7 @@ func (f *FileHashmap) writeUInt64(pos int64, val uint64, filePos uint) {
 	}
 }
 
-func (f *FileHashmap) readUInt64(pos int64, filePos uint) uint64 {
+func (f *fileHashmap) readUInt64(pos int64, filePos uint) uint64 {
 	if f.fileList[filePos] == nil {
 		panic(fmt.Errorf("file %d not open", filePos))
 	}
@@ -78,7 +78,7 @@ func (f *FileHashmap) readUInt64(pos int64, filePos uint) uint64 {
 	}
 
 	if err := binary.Read(bytes.NewBuffer(bs), binary.LittleEndian, &val); err != nil {
-		panic (err)
+		panic(err)
 	}
 
 	return val

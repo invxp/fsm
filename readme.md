@@ -2,12 +2,11 @@
 
 FileHashmap 文件Hash索引（支持重复的Key）基于Go实现, 能力列表:
 
-1. Get(key string) []FileIndex
+1. Get(key string) []values
 2. Set(key string, value uint32)
 
 具体介绍:
 
-* 实现类似RocketMQ索引系统
 * 优化了Key存储逻辑（固定的Key只会存在一个文件里）
 * 新增了过期机制（添加了下一次可以写入的游标）
 * 待补充细节...
@@ -19,28 +18,29 @@ FileHashmap 文件Hash索引（支持重复的Key）基于Go实现, 能力列表
 ```go
 package main
 
-func TestRaft(t *testing.T) {
+import (
+	"github.com/invxp/fsm"
+	"testing"
+)
+
+func TestSingle(t *testing.T) {
 	// 初始化
 	// 最大索引槽数量
 	// 最大索引数量
 	// 最多文件数量
-	// 文件具柄初始化
-	// 是否打印日志
-	fhm := &FileHashmap{
-		2,
-		3,
-		1,
-		make(map[uint]*os.File),
-		false}
+	// 索引目录
+	fileHashMap := fsm.NewFileHashMap(
+		fsm.DefaultMaxSlotCount,
+		fsm.DefaultMaxIndexCount,
+		fsm.DefaultMaxFileCount,
+		"idx",
+	)
 
-	// 选定加载索引的目录
-	fhm.LoadFiles("idx")
-	// 打印KV
-	printKV(t, fhm, "0", 0)
 	// 写入KV
-	fhm.Set("0", 1)
+	fileHashMap.Set("Key", 1)
+	
 	// 打印KV
-	printKV(t, fhm, "0", 1, 1)
+	fileHashMap.Get("Key")
 }
 ```
 
