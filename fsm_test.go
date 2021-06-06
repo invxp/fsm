@@ -5,7 +5,7 @@ import (
 )
 
 func getKV(t *testing.T, f *fileHashmap, key string, exceptCount int, exceptValues ...uint32) {
-	kv := f.Get(key)
+	kv := f.getIndex(key)
 	if exceptCount != len(kv) {
 		t.Fatalf("except: %d, total: %d", exceptCount, len(kv))
 	}
@@ -14,6 +14,35 @@ func getKV(t *testing.T, f *fileHashmap, key string, exceptCount int, exceptValu
 			t.Fatalf("except value: %d, current: %d", exceptValues[i], v)
 		}
 	}
+}
+
+func getKVS(t *testing.T, f *fileHashmap, key string, exceptCount int, exceptValues ...[]byte) {
+	kv := f.GetD(key)
+	if exceptCount != len(kv) {
+		t.Fatalf("except: %d, total: %d", exceptCount, len(kv))
+	}
+
+	for i, v := range kv {
+		if string(exceptValues[i]) != string(v) {
+			t.Fatalf("except value: %d, current: %d", exceptValues[i], v)
+		}
+	}
+}
+
+func TestData(t *testing.T) {
+	fhm := NewFileHashMap(
+		2,
+		3,
+		1,
+		"idx",
+	)
+
+	fhm.SetD("0", []byte("111"))
+	getKVS(t, fhm, "0", 1, []byte("111"))
+	fhm.SetD("0", []byte("2222"))
+	getKVS(t, fhm, "0", 2, []byte("2222"), []byte("111"))
+	fhm.SetD("0", []byte("333333"))
+	getKVS(t, fhm, "0", 3, []byte("333333"), []byte("2222"), []byte("111"))
 }
 
 func TestSingle(t *testing.T) {
