@@ -1,7 +1,6 @@
 package fsm
 
 import (
-	"fmt"
 	"hash/crc32"
 	"math"
 	"os"
@@ -62,13 +61,12 @@ func (f *fileHashmap) nextWriteableIndexOffset(absFilePos uint) uint32 {
 
 // writeNextWriteableIndexOffset 下一次可写入索引的游标位置
 // 占Header的[20-23]
-func (f *fileHashmap) writeNextWriteableIndexOffset(absFilePos uint) uint32 {
+func (f *fileHashmap) writeNextWriteableIndexOffset(absFilePos uint) {
 	pos := f.nextWriteableIndexOffset(absFilePos) + 1
 	if pos >= f.maxIndexCount {
 		pos = 0
 	}
 	f.writeUInt32(0+4+8+8, pos, f.indexList[absFilePos])
-	return pos
 }
 
 // nextWriteableDataOffset 获取下一次可写入索引的游标位置（最多 1<<32 - 1 个）
@@ -109,15 +107,13 @@ func (f *fileHashmap) readIndex(absIndexPos int64, absFilePos uint) (keyHash uin
 
 // writeData 写入数据
 func (f *fileHashmap) writeData(absDataPos int64, value []byte, absFilePos uint) {
-	//+last shift offset
-	//current > last, more code ...
-	//current < last, less code ...
-	//TODO
-	fmt.Println(f.readNextAvailableWritePos(uint32(absDataPos), len(value), absFilePos))
-
+	nextWritePos := uint32(0)
+	if f.nextWriteableIndexOffset(absFilePos) > 0 {
+		nextWritePos = f.readNextAvailableWritePos(uint32(absDataPos), len(value), absFilePos)
+	}
 	f.writeUInt32(absDataPos, uint32(len(value)), f.dataList[absFilePos])
 	f.writeByte(absDataPos+4, value, f.dataList[absFilePos])
-	f.writeNextWriteableDataOffset(f.readNextAvailableWritePos(uint32(absDataPos), len(value), absFilePos), absFilePos)
+	f.writeNextWriteableDataOffset(nextWritePos, absFilePos)
 }
 
 // readData 读数据
@@ -149,7 +145,7 @@ func (f *fileHashmap) readNextAvailableWritePos(absDataPos uint32, bytesLength i
 			writeOffset += uint32(bytesLength)
 		}
 
-		if writeOffset-absDataPos >= uint32(bytesLength) {
+		if writeOffset-absDataPos >= uint32(bytesLength) + 4 {
 			break
 		}
 	}

@@ -116,15 +116,13 @@ func (f *fileHashmap) SetD(key string, value []byte) {
 
 	currentAvailableIndexSize := f.nextWriteableIndexOffset(absFilePos)
 
-	currentAvailableDataSize := f.nextWriteableDataOffset(absFilePos)
-
 	absIndexStartPos := int64(HeaderSize) + int64(f.maxSlotCount)*int64(SlotSize) + int64(currentAvailableIndexSize*IndexSize)
 
-	f.writeIndex(absIndexStartPos, keyHash, currentAvailableDataSize, uint32(f.writeBeginTime(absFilePos)), slotValue, absFilePos)
+	f.writeIndex(absIndexStartPos, keyHash, f.nextWriteableDataOffset(absFilePos), uint32(f.writeBeginTime(absFilePos)), slotValue, absFilePos)
 
 	f.writeUInt32(absSlotPos, currentAvailableIndexSize, f.indexList[absFilePos])
 
-	f.writeData(int64(currentAvailableDataSize), value, absFilePos)
+	f.writeData(int64(f.nextWriteableDataOffset(absFilePos)), value, absFilePos)
 }
 
 // GetD Key=String
@@ -140,6 +138,8 @@ func (f *fileHashmap) GetD(key string) [][]byte {
 	absFilePos := uint(keyHash) % f.maxFileCount
 
 	indexList := f.getIndex(key)
+
+	log.Println(indexList)
 
 	for _, offset := range indexList {
 		if data := f.readData(int64(offset), absFilePos); len(data) > 0 {
