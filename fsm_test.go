@@ -9,9 +9,10 @@ func getKV(t *testing.T, f *fileHashmap, key string, exceptCount int, exceptValu
 	if exceptCount != len(kv) {
 		t.Fatalf("except: %d, total: %d", exceptCount, len(kv))
 	}
-	for i, v := range kv {
-		if exceptValues[i] != v {
-			t.Fatalf("except value: %d, current: %d", exceptValues[i], v)
+
+	for i, value := range kv {
+		if exceptValues[i] != value {
+			t.Fatalf("except value: %d, current: %d", exceptValues[i], value)
 		}
 	}
 }
@@ -43,8 +44,38 @@ func TestDataLess(t *testing.T) {
 	getKVS(t, fhm, "0", 2, []byte("2222"), []byte("111"))
 	fhm.SetD("0", []byte("333333"))
 	getKVS(t, fhm, "0", 3, []byte("333333"), []byte("2222"), []byte("111"))
-	fhm.SetD("0", []byte("1"))
-	getKVS(t, fhm, "0", 3, []byte("1"), []byte("333333"), []byte("2222"))
+	fhm.SetD("0", []byte("44"))
+	getKVS(t, fhm, "0", 3, []byte("44"), []byte("333333"), []byte("2222"))
+	fhm.SetD("0", []byte("555"))
+	getKVS(t, fhm, "0", 3, []byte("555"), []byte("44"), []byte("333333"))
+	fhm.SetD("0", []byte("6666"))
+	getKVS(t, fhm, "0", 3, []byte("6666"), []byte("555"), []byte("44"))
+	fhm.SetD("0", []byte("7"))
+	getKVS(t, fhm, "0", 3, []byte("7"), []byte("6666"), []byte("555"))
+}
+
+func TestDataSame(t *testing.T) {
+	fhm := NewFileHashMap(
+		2,
+		3,
+		1,
+		"idx",
+	)
+
+	fhm.SetD("0", []byte("111"))
+	getKVS(t, fhm, "0", 1, []byte("111"))
+	fhm.SetD("0", []byte("2222"))
+	getKVS(t, fhm, "0", 2, []byte("2222"), []byte("111"))
+	fhm.SetD("0", []byte("333333"))
+	getKVS(t, fhm, "0", 3, []byte("333333"), []byte("2222"), []byte("111"))
+	fhm.SetD("0", []byte("666"))
+	getKVS(t, fhm, "0", 3, []byte("666"), []byte("333333"), []byte("2222"))
+	fhm.SetD("0", []byte("7777"))
+	getKVS(t, fhm, "0", 3, []byte("7777"), []byte("666"), []byte("333333"))
+	fhm.SetD("0", []byte("888888"))
+	getKVS(t, fhm, "0", 3, []byte("888888"), []byte("7777"), []byte("666"))
+	fhm.SetD("0", []byte("999"))
+	getKVS(t, fhm, "0", 3, []byte("999"), []byte("888888"), []byte("7777"), )
 }
 
 func TestDataMore(t *testing.T) {
@@ -61,14 +92,11 @@ func TestDataMore(t *testing.T) {
 	getKVS(t, fhm, "0", 2, []byte("2222"), []byte("111"))
 	fhm.SetD("0", []byte("333333"))
 	getKVS(t, fhm, "0", 3, []byte("333333"), []byte("2222"), []byte("111"))
-	fhm.SetD("0", []byte("111111"))
-	getKVS(t, fhm, "0", 2, []byte("111111"), []byte("333333"))
+	fhm.SetD("0", []byte("1111"))
+	getKVS(t, fhm, "0", 2, []byte("1111"), []byte("333333"))
 
-	//TODO
-	//PrintALL（SIZE+DATA）
-	fhm.SetD("0", []byte("666"))
-	getKVS(t, fhm, "0", 3, []byte("666"), []byte("111111"), []byte("333333"))
-
+	fhm.SetD("0", []byte("66666"))
+	getKVS(t, fhm, "0", 2, []byte("66666"), []byte("1111"))
 }
 
 func TestSingle(t *testing.T) {

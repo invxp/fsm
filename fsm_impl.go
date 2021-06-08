@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"fmt"
 	"hash/crc32"
 	"math"
 	"os"
@@ -108,6 +109,7 @@ func (f *fileHashmap) readIndex(absIndexPos int64, absFilePos uint) (keyHash uin
 // writeData 写入数据
 func (f *fileHashmap) writeData(absDataPos int64, value []byte, absFilePos uint) {
 	nextWritePos := uint32(0)
+	//如果索引的位置不是0,则要找合适的位置
 	if f.nextWriteableIndexOffset(absFilePos) > 0 {
 		nextWritePos = f.readNextAvailableWritePos(uint32(absDataPos), len(value), absFilePos)
 	}
@@ -135,11 +137,13 @@ func (f *fileHashmap) readNextAvailableWritePos(absDataPos uint32, bytesLength i
 
 	for {
 		pos := f.readUInt32(int64(writeOffset), f.dataList[absFilePos])
+		data := f.readByte(int64(writeOffset) + 4, uint64(pos), f.dataList[absFilePos])
+
+		fmt.Println("Data Pos:", writeOffset, "Length:", pos, "Content:", string(data))
 
 		writeOffset += 4
 
 		if pos < math.MaxUint32 {
-			//See
 			writeOffset += pos
 		} else {
 			writeOffset += uint32(bytesLength)
@@ -180,13 +184,17 @@ func (f *fileHashmap) getIndex(key string) []uint32 {
 
 	nextIndex := slotValue
 
+	duplicateValue := make(map[uint32]struct{}, 0)
+
 	for {
 		absIndexPos := int64(HeaderSize) + int64(f.maxSlotCount)*int64(SlotSize) + int64(nextIndex)*int64(IndexSize)
 
 		hash, value, _, prevIndex := f.readIndex(absIndexPos, absFilePos)
 
 		if keyHash == hash {
-			values = append(values, value)
+			if _, exists := duplicateValue[value]; !exists {
+				values = append(values, value)
+			}
 		}
 
 		if (prevIndex == lastIndex) || (nextIndex == 0 && prevIndex == 0) {
@@ -194,5 +202,7 @@ func (f *fileHashmap) getIndex(key string) []uint32 {
 		}
 
 		nextIndex = prevIndex
+
+		duplicateValue[value] = struct{}{}
 	}
 }
