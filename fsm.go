@@ -7,11 +7,8 @@ import (
 	"strconv"
 )
 
-//TODO
-
 //1.    写数据时遍历找到写到哪里，并且在这里面找到最后一次记录
 //1.1.1 如果满足(<=)写入数据
-//1.1.2 看剩余空间是否<=5
 //1.1.3 是则写入一个新链路
 //2. 如果不满足，继续往后找，直到找到合适的位置
 //3. 找到后写入数据
@@ -138,8 +135,6 @@ func (f *fileHashmap) GetD(key string) [][]byte {
 	absFilePos := uint(keyHash) % f.maxFileCount
 
 	indexList := f.getIndex(key)
-
-	log.Println(indexList)
 
 	for _, offset := range indexList {
 		if data := f.readData(int64(offset), absFilePos); len(data) > 0 {

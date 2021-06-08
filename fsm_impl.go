@@ -1,7 +1,6 @@
 package fsm
 
 import (
-	"fmt"
 	"hash/crc32"
 	"math"
 	"os"
@@ -123,23 +122,20 @@ func (f *fileHashmap) readData(absDataPos int64, absFilePos uint) []byte {
 	return f.readByte(absDataPos+4, uint64(f.readUInt32(absDataPos, f.dataList[absFilePos])), f.dataList[absFilePos])
 }
 
-// readNextAvailableWritePos
 
+
+// readNextAvailableWritePos 获取下次可写入数据的位置
 /*
 ||||---------
 ||||-11111111-||||-222222-||||-3333333333333-||||-4---------------------------------
 ||||-11110000-||||-222222-||||-3333333333333-||||-4---------------------------------
-||||-1111111111111111111111-||||-33333333333-||||-4---------------------------------
+||||-111111111111111111111100000000000000000-||||-4---------------------------------
 */
-
 func (f *fileHashmap) readNextAvailableWritePos(absDataPos uint32, bytesLength int, absFilePos uint) uint32 {
 	writeOffset := absDataPos
 
 	for {
 		pos := f.readUInt32(int64(writeOffset), f.dataList[absFilePos])
-		data := f.readByte(int64(writeOffset) + 4, uint64(pos), f.dataList[absFilePos])
-
-		fmt.Println("Data Pos:", writeOffset, "Length:", pos, "Content:", string(data))
 
 		writeOffset += 4
 
