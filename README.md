@@ -4,6 +4,7 @@ FileHashmap 文件Hash索引（支持重复的Key）基于Go实现, 能力列表
 
 1. Get(key string) []values
 2. Set(key string, value uint32)
+3. Del(key string)
 
 具体介绍:
 
